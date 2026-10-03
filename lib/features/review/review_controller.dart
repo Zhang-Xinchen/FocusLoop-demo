@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../app/providers.dart';
 import '../../domain/domain.dart';
+import '../../platform/notification_service.dart';
 import '../tasks/task_service.dart';
 
 class ReviewController {
@@ -16,6 +17,7 @@ class ReviewController {
     ReviewResult result,
   ) async {
     await _ref.read(reviewRepositoryProvider).complete(schedule, result);
+    await NotificationService.instance.cancelReview(schedule.id);
     final plan = const EbbinghausScheduler().nextReview(
       completed: schedule,
       result: result,
@@ -25,14 +27,21 @@ class ReviewController {
     if (plan.mastered) {
       return;
     }
-    await _ref.read(reviewRepositoryProvider).save(ReviewSchedule(
-          id: const Uuid().v4(),
-          taskId: schedule.taskId,
-          round: plan.round,
-          dueAt: plan.dueAt,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
+    final next = ReviewSchedule(
+      id: const Uuid().v4(),
+      taskId: schedule.taskId,
+      round: plan.round,
+      dueAt: plan.dueAt,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    await _ref.read(reviewRepositoryProvider).save(next);
+    await NotificationService.instance.scheduleReview(
+      scheduleId: next.id,
+      title: task.title,
+      round: next.round,
+      dueAt: next.dueAt,
+    );
   }
 }
 
